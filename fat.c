@@ -50,7 +50,8 @@ void insere(char nome[9]){
 		int prox = -1; //fim do arquivo
 
 		fseek(disco, -1, SEEK_CUR);
-		fwrite(&c, sizeof(char), 2, disco);//indica que não esta removido e que é cabeçalho
+		fwrite(&c, sizeof(char), 1, disco);//indica que não esta removido e que é cabeçalho
+		fwrite(&c, sizeof(char), 1, disco);//indica que não esta removido e que é cabeçalho
 		//printf("achou cabeçalho na posição %ld\n", ftell(disco)-2);
 
 		int ponteiroProx = ftell(disco);//salva a posição do disco para atualizar
@@ -115,6 +116,63 @@ void insere(char nome[9]){
 	}
 }
 
+int retornaRRN(FILE *disco, char nome[9]){
+	int RRN;
+	fseek(disco, 5, SEEK_SET);
+	int tamanhodisco = 16384;	
+	while(tamanhodisco > 0){
+		char removido;
+		fread(&removido, sizeof(char), 1, disco);
+		if(removido != 0){
+			char cabecalho;
+			fread(&cabecalho, sizeof(char), 1, disco);
+			if(cabecalho == 1){
+				char nomeArquivo[9];
+				fseek(disco, 4, SEEK_CUR);
+				fread(nomeArquivo, sizeof(char)*9, 1, disco);
+				if(strcmp(nome, nomeArquivo) == 0){
+					fseek(disco, -15, SEEK_CUR);
+					RRN = (ftell(disco)-5)/TAMBLC;
+					return RRN;
+				}
+				fseek(disco, TAMBLC-15, SEEK_CUR);
+			}
+			else
+				fseek(disco, TAMBLC-2, SEEK_CUR);
+		}
+		else
+			fseek(disco, TAMBLC-1, SEEK_CUR);
+		tamanhodisco-=32;
+	}
+	return -1;
+}
+
+void busca(FILE *disco, char nome[9]){
+	int RRN = retornaRRN(disco, nome);
+	fseek(disco, (RRN*TAMBLC)+7, SEEK_SET);
+
+	int p;
+	fread(&p, sizeof(int), 1, disco);
+	
+	fseek(disco, 9, SEEK_CUR);
+
+	char * conteudo = (char * ) malloc(sizeof(char)*(TAMBLC-14));
+	fread(conteudo, sizeof(char)*(TAMBLC-15), 1 , disco);
+	conteudo[TAMBLC-15]= '\0';
+	printf("%s", conteudo);
+
+	while(p != -1){
+		conteudo = (char *) realloc(conteudo, TAMBLC-5);
+		fseek(disco, (p*TAMBLC)+7, SEEK_SET);
+		fread(&p, sizeof(int), 1, disco);
+		fread(conteudo, sizeof(char)*(TAMBLC-6), 1, disco);
+		conteudo[TAMBLC-7]= '\0';
+		printf("%s", conteudo);
+	}
+	printf("\n");
+}
+
+
 
 int main(int argc, char const *argv[]){
 	int op;
@@ -134,7 +192,9 @@ int main(int argc, char const *argv[]){
 
 			case 3:
 				scanf("%s", nome);
-				busca(nome);
+				FILE *disco = fopen("lista.txt", "r");
+				busca(disco, nome);
+				//printf("%d",retornaRRN(disco, nome));
 			break;
 /*
 			case 4:
