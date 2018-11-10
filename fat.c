@@ -105,7 +105,7 @@ int insere(char nome[9]){
 			}
 			fseek(disco, -1, SEEK_CUR);
 			
-			int atual = ftell(disco);
+			long int atual = ftell(disco);
 			prox =  (atual-5)/ TAMBLC;
 			
 			fseek(disco, ponteiroProx, SEEK_SET);
