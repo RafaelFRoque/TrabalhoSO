@@ -55,6 +55,7 @@ void busca(FAT *fat, char nome[9]){
                 RRN = fat->f[RRN];
             }
             printf("\n");
+            return;
         }
         else if(i > (TAMDSC/TAMBLC)){
             printf("Arquivo não encontrado\n");
@@ -66,7 +67,7 @@ void busca(FAT *fat, char nome[9]){
     }
 }
 
-void buscaBloco(FAT *fat, int numeroBloco){
+void buscaBloco(FAT *fat, char nome[9], int numeroBloco){
     
     FILE *disco = fopen("lista.txt", "r");
     char integridade;
@@ -76,6 +77,37 @@ void buscaBloco(FAT *fat, int numeroBloco){
         return;
     }
     
+    int i = 0;
+    int RRN = 0;
+    char * conteudo = (char * ) malloc(sizeof(char)*(TAMBLC-5));
+    while(1){
+        if((strcmp(fat->l[i].nome, nome))==0){
+            if(numeroBloco == 0){
+                RRN = fat->l[i].inicio;
+                
+                fseek(disco, (RRN*TAMBLC)+15, SEEK_SET);
+                fread(conteudo, sizeof(char)*(TAMBLC-15), 1 , disco);
+                conteudo[TAMBLC-15]= '\0';
+                printf("%s\n", conteudo);
+                return;
+            }
+            for(int j = 0; j <= numeroBloco; j++){
+                RRN = fat->f[RRN];
+                fseek(disco, (RRN*TAMBLC)+7, SEEK_SET);
+                fread(conteudo, sizeof(char)*(TAMBLC-6), 1, disco);
+                conteudo[TAMBLC-6]= '\0';
+                printf("%s\n", conteudo);
+                return;
+            }
+        }
+        else if(i > (TAMDSC/TAMBLC)){
+            printf("Arquivo não encontrado\n");
+            break;
+        }
+        else {
+            i++;
+        }
+    }
     
 }
 
