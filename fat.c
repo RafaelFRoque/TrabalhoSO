@@ -64,7 +64,17 @@ void busca(FAT *fat, char nome[9]){
             i++;
         }
     }
+}
 
+void buscaBloco(FAT *fat, int numeroBloco){
+    
+    FILE *disco = fopen("lista.txt", "r");
+    char integridade;
+    fread(&integridade, sizeof(char), 1, disco);
+    if(integridade != 0){
+        printf("Disco corrompido\n");
+        return;
+    }
     
     
 }
