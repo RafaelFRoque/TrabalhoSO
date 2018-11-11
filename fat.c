@@ -1,151 +1,186 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define TAMBLC 32
+#include <math.h>
+#include <time.h>
 
-void inicaliza(){
+#define TAMBLC 32
+#define TAMDSC 16384
+
+typedef struct Relatorio{
+	char nome[9];
+	int operacao, espaco;
+	double tempo;
+}relatorio;
+
+typedef struct {
+	char nome[9];
+	int inicio;
+}ListaArquivos;
+
+typedef struct {
+	ListaArquivos l[100];
+	int tamLista;
+	int f[TAMDSC/TAMBLC];
+	
+}FAT;
+
+
+void inicaliza(FAT *fat){
+	
 	char c = 0;
-	int tamarq = 16384;
+	int tamarq = TAMDSC;
 	FILE *disco = fopen("lista.txt", "w+");//disco = file lista
-	FILE *tabelaFat = fopen("lfat.txt", "w+"); 
-	fwrite(&c, sizeof(char), 1, tabelaFat);//indica a estabilidade do arquivo
+	FILE *discoFAT = fopen("lfat.txt", "w+"); 
+	
+	fwrite(&c, sizeof(char), 1, discoFAT);//indica a estabilidade do arquivo
 	fwrite(&c, sizeof(char), 1, disco);
-	fwrite(&tamarq, sizeof(int), 1, tabelaFat);//escreve a quantidade de espaço disponível
+	fwrite(&tamarq, sizeof(int), 1, discoFAT);//escreve a quantidade de espaço disponível
 	fwrite(&tamarq, sizeof(int), 1, disco);
+	
 	for(int i=0; i<tamarq; i++){
-		fwrite(&c, sizeof(char), 1, tabelaFat);//completa os 16384 bytes com valores invalidos
+		fwrite(&c, sizeof(char), 1, discoFAT);//completa os 16384 bytes com valores invalidos
 		fwrite(&c, sizeof(char), 1, disco);
 	}
+
+	for(int i=0; i< TAMDSC/TAMBLC; i++)//coloca todos as posição da FAT como vazias
+		fat->f[i] = -3;
+	fat->tamLista = 0;
 	fclose(disco);
-	fclose(tabelaFat);
+	fclose(discoFAT);
 }
 
-void insere(char nome[9]){
+int insereFAT(FAT *fat, char nome[9]){
 
 	FILE *fp = fopen(nome, "r");
-	FILE *disco = fopen("lista.txt", "r+");
+	FILE *disco = fopen("lfat.txt", "r+");
+
+	char integridade;
+	fread(&integridade, sizeof(char), 1, disco);
+
+	if(integridade != 0){
+		printf("Disco corrompido\n");
+		return -1;
+	}
+
+	fseek(disco, 0, SEEK_SET);
+	integridade = 1;
+	fwrite(&integridade, sizeof(char), 1, disco);
 
 	fseek(fp, 0, SEEK_END);
-	int tamanhofp = ftell(fp);	
-	//printf("tamanhofp = %d\n", tamanhofp);
+	int tamanhofp = ftell(fp);
+	fseek(fp, 0, SEEK_SET);	
 
-	fseek(disco, 1, SEEK_SET);
 	int tamanhodisco;
-
 	fread(&tamanhodisco, sizeof(int), 1, disco);
-	//printf("tamanhodisco = %d\n", tamanhodisco);
-	
-	if(tamanhofp <= tamanhodisco){ //se houver espaço para a inserção
-		
-		char estaVazio;
-		fread(&estaVazio, sizeof(char), 1, disco);
-		
-		while(estaVazio != 0){//procura o primeiro bloco que está vazio
-			fseek(disco, TAMBLC-1, SEEK_CUR);
-			printf("POSIÇÂO1 == %ld\n", ftell(disco)-5);
-			fread(&estaVazio, sizeof(char), 1, disco);
-		}
 
-		char c = 1;
-		int prox = -1; //fim do arquivo
+	if(tamanhofp <= tamanhodisco){
+		int i=0;
+		while(fat->f[i] != -3)
+			i++;
 
-		fseek(disco, -1, SEEK_CUR);
-		fwrite(&c, sizeof(char), 2, disco);//indica que não esta removido e que é cabeçalho
-		//printf("achou cabeçalho na posição %ld\n", ftell(disco)-2);
+		strcpy(fat->l[fat->tamLista].nome, nome);
+		fat->l[fat->tamLista].inicio = i;
+		fat->tamLista++;
+		char *conteudo = (char *) malloc(sizeof(char)*(TAMBLC));
 
-		int ponteiroProx = ftell(disco);//salva a posição do disco para atualizar
-
-		//printf("Salva a posição == %ld\n", ftell(fprox));
-
-		fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo temporariamente.
-		fwrite(nome, sizeof(char), strlen(nome), disco);//salva o nome do arquivo
-		char *conteudo = (char *) malloc(sizeof(char)*(TAMBLC-15));
-
-		fseek(fp, 0, SEEK_SET); 
-		fread(conteudo, sizeof(char)*(TAMBLC-15), 1, fp);//usa o valor restante do bloco para armazenar o arquivo
-		//printf("leu e salvou %s\n", conteudo);
-		fwrite(conteudo, sizeof(char)*(TAMBLC-15), 1, disco);
-		
-		tamanhofp -= TAMBLC-15; //atualiza do arquivo que falta escrever
-		conteudo = (char *)realloc(conteudo, TAMBLC-6);
-		
-		//printf("disco == %ld\n", ftell(disco));
-
-		
 		while(tamanhofp > 0){
-			printf("entrou aqui\n");
 
-			fread(&estaVazio, sizeof(char), 1, disco);
-			while(estaVazio != 0){//procura o proximo bloco estaVazio
-				fseek(disco, TAMBLC-1, SEEK_CUR);
-				printf("POSIÇÂO2 == %ld\n", ftell(disco)-5);
-				fread(&estaVazio, sizeof(char), 1, disco);
+			fat->f[i]= -1;
+			fread(conteudo, (tamanhofp < TAMBLC)? (tamanhofp*sizeof(char)) : (sizeof(char)*TAMBLC) , 1, fp);
+			if(tamanhofp < TAMBLC)
+				for(int i = tamanhofp; i < TAMBLC; i++)
+					conteudo[i] = 0;
+
+
+			fseek(disco, (i*TAMBLC)+5, SEEK_SET);
+			fwrite(conteudo, sizeof(char)*TAMBLC, 1, disco);
+			tamanhofp -= TAMBLC;
+
+			if(tamanhofp > 0){
+				int aux = i;
+				while(fat->f[i] != -3)
+					aux++;
+				fat->f[i] = aux;
+				i=aux;
 			}
-			fseek(disco, -1, SEEK_CUR);
-
-			
-			int atual = ftell(disco);
-			prox =  (atual-5)/ TAMBLC;
-
-			//printf("Escreve na posição == %ld\n", ftell(fprox));
-			printf("prox == %d\n", prox);
-			fseek(disco, ponteiroProx, SEEK_SET);
-			fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo temporariamente.
-			
-			fseek(disco, atual, SEEK_SET);
-			c = 1;
-			fwrite(&c, sizeof(char), 1, disco);//indica que não esta removido
-			c = 0;
-			fwrite(&c, sizeof(char), 1, disco);//indica que não é cabeçalho
-
-			
-			ponteiroProx = ftell(disco);//salva a posição do disco para atualizar
-			prox = -1;
-			fwrite(&prox, sizeof(int),  1, disco);
-
-			fread(conteudo, (tamanhofp < (TAMBLC-6))? sizeof(char)*tamanhofp : sizeof(char)* (TAMBLC-6), 1, fp);//usa o valor restante do bloco para armazenar o arquivo
-			int a = fwrite(conteudo, sizeof(char)* (TAMBLC-6), 1, disco);
-			printf("AAAAAAAAAA = %d\n", a);
-			tamanhofp -= TAMBLC-6;			
-			printf("disco == %ld\n", ftell(disco));
 		}
-
-		fread(&c,  sizeof(char), 1, disco);
 		free(conteudo);
+
 	}
+
 }
 
 
 int main(int argc, char const *argv[]){
+	
+	relatorio r[1000];
 	int op;
-	inicaliza();
-	while(scanf("%d ", &op) != EOF){
-		char nome[9];
-		switch(op){
+	int bloco;
+	int i = 0; 
+	char nome[9];
+	FAT fat;
+	inicaliza(&fat);
+
+
+	while(scanf("%d", &op) != EOF){
+	
+		if(op != 5){
+			scanf("%s", nome);
+			if(strlen(nome) != 9){
+				printf("Nome invalido\n");
+				break;
+			}
+		}
+
+		clock_t fim;
+		
+		r[i].operacao = op;
+		strcpy(r[i].nome, nome);
+		
+	switch(op){
+			
 			case 1:
-				scanf("%s", nome);
-				insere(nome);
+				fim = clock();
+				r[i].espaco = insereFAT(&fat, nome);
+				fim = clock() - fim;
+				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
 			break;
 /*
 			case 2:
-				scanf("%s ", nome);
-				remove(nome);
-			break; */
+				
+				fim = clock();
+				r[i].espaco = remover(nome);
+				fim = clock() - fim;
+				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
+				
+			break;
 
 			case 3:
-				scanf("%s", nome);
+
+				fim = clock();
 				busca(nome);
+				fim = clock() - fim;
+				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
+		
 			break;
-/*
+
 			case 4:
-				int bloco;
-				scanf("%s %d", nome, bloco);
+
+				scanf("%d", &bloco);
+				fim = clock();
 				buscaBloco(nome, bloco);
+				fim = clock() - fim;
+				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
+
 			break;
 
 			case 5:
-				imprimeRelatorio();
-			break;*/
+				imprimeRelatorio(r, i);			
+			break;
+		}
+		i++;
+		//r = (relatorio *) realloc(r, sizeof(relatorio)*(i+3));*/
 		}
 	}
 
