@@ -99,7 +99,7 @@ int insereFAT(FAT *fat, char nome[9]){
 
 			if(tamanhofp > 0){
 				int aux = i;
-				while(fat->f[i] != -3)
+				while(fat->f[aux] != -3)
 					aux++;
 				fat->f[i] = aux;
 				i=aux;
@@ -108,6 +108,13 @@ int insereFAT(FAT *fat, char nome[9]){
 		free(conteudo);
 
 	}
+	fseek(disco, 0, SEEK_SET);
+	integridade = 0;
+	fwrite(&integridade, sizeof(char), 1, disco);
+
+	fclose(disco);
+	fclose(fp);
+	return 0;
 
 }
 
@@ -182,6 +189,12 @@ int main(int argc, char const *argv[]){
 		i++;
 		//r = (relatorio *) realloc(r, sizeof(relatorio)*(i+3));*/
 		}
+	}
+	for(int i=0; i<fat.tamLista; i++){
+		printf("fat.ListaArquivos[%d] == %s|||| inicio = %d\n", i, fat.l[i].nome, fat.l[i].inicio);
+	}
+	for(int i=0; i<100; i++){
+		printf("FAT[%d] == %d\n", i, fat.f[i]);
 	}
 
 
