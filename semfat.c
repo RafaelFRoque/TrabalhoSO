@@ -3,7 +3,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-
 #define TAMBLC 32
 #define TAMDSC 16384
 
@@ -17,36 +16,33 @@ void inicaliza(){
 	
 	char c = 0;
 	int tamarq = TAMDSC;
-	
 	FILE *disco = fopen("lista.txt", "w+");//disco = file lista
-	FILE *tabelaFat = fopen("lfat.txt", "w+"); 
 	
-	fwrite(&c, sizeof(char), 1, tabelaFat);//indica a estabilidade do arquivo
 	fwrite(&c, sizeof(char), 1, disco);
-	fwrite(&tamarq, sizeof(int), 1, tabelaFat);//escreve a quantidade de espaço disponível
 	fwrite(&tamarq, sizeof(int), 1, disco);
 	
-	for(int i=0; i<tamarq; i++){
-		fwrite(&c, sizeof(char), 1, tabelaFat);//completa os 16384 bytes com valores invalidos
+	for(int i=0; i<tamarq; i++)
 		fwrite(&c, sizeof(char), 1, disco);
-	}
 	
 	fclose(disco);
-	fclose(tabelaFat);
 }
 
 int insere(char nome[9]){
-
-	/*FALTA FAZER: Paridade do arquivo, vericicar nome válido, verificar retornos de FOPEN()*/
-
 	FILE *fp = fopen(nome, "r");
 	FILE *disco = fopen("lista.txt", "r+");
+	if(fp == NULL){
+		printf("Arquivo de dados não encontrado\n");
+		fclose(disco);
+		return -1;
+	}
 
 	char integridade;
 	fread(&integridade, sizeof(char), 1, disco);
 
 	if(integridade != 0){
 		printf("Disco corrompido\n");
+		fclose(fp);
+		fclose(disco);
 		return -1;
 	}
 
@@ -82,7 +78,7 @@ int insere(char nome[9]){
 		
 		int ponteiroProx = ftell(disco);//salva a posição do disco para atualizar
 
-		fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo temporariamente.
+		fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo tempo1rariamente.
 		fwrite(nome, sizeof(char), strlen(nome), disco);//salva o nome do arquivo
 		char *conteudo = (char *) malloc(sizeof(char)*(TAMBLC-15));
 
@@ -107,7 +103,7 @@ int insere(char nome[9]){
 			prox =  (atual-5)/ TAMBLC;
 			
 			fseek(disco, ponteiroProx, SEEK_SET);
-			fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo temporariamente.
+			fwrite(&prox, sizeof(int), 1, disco);//indica fim de arquivo tempo1rariamente.
 			
 			fseek(disco, atual, SEEK_SET);
 			c = 1;
@@ -146,6 +142,7 @@ int insere(char nome[9]){
 	fclose(disco);
 	fclose(fp);
 
+	printf("Inserido com sucesso sem FAT\n");
 	return tamanhoEmDisco/TAMBLC;
 }
 
@@ -190,8 +187,10 @@ void busca(char nome[9]){
 	FILE *disco = fopen("lista.txt", "r");
 	char integridade;
 	fread(&integridade, sizeof(char), 1, disco);
+
 	if(integridade != 0){
 		printf("Disco corrompido\n");
+		fclose(disco);
 		return;
 	}
 	fseek(disco, 0, SEEK_SET);
@@ -232,6 +231,7 @@ void buscaBloco(char nome[9], int numeroBloco){
 	fread(&integridade, sizeof(char), 1, disco);
 	if(integridade != 0){
 		printf("Disco corrompido\n");
+		fclose(disco);
 		return;
 	}
 	fseek(disco, 0, SEEK_SET);
@@ -280,10 +280,13 @@ int remover(char nome[9]){
 	FILE *disco = fopen("lista.txt", "r+");
 	char integridade;
 	fread(&integridade, sizeof(char), 1, disco);
+
 	if(integridade != 0){
 		printf("Disco corrompido\n");
+		fclose(disco);
 		return -1;
 	}
+
 	fseek(disco, 0, SEEK_SET);
 	integridade = 1;
 	fwrite(&integridade, sizeof(char), 1, disco);
@@ -291,6 +294,10 @@ int remover(char nome[9]){
 
 	if(RRN == -1){
 		printf("Arquivo não encontrado\n");
+		fseek(disco, 0, SEEK_SET);
+		integridade = 0;
+		fwrite(&integridade, sizeof(char), 1, disco);
+		fclose(disco);
 		return -1;
 	}
 
@@ -313,6 +320,7 @@ int remover(char nome[9]){
 	int tamanhodisco;
 	fread(&tamanhodisco, sizeof(int), 1, disco);
 
+
 	tamanhodisco += count*TAMBLC; 
 	fseek(disco, 1, SEEK_SET);
 	fwrite(&tamanhodisco, sizeof(int), 1, disco);
@@ -322,7 +330,7 @@ int remover(char nome[9]){
 	fwrite(&integridade, sizeof(char), 1, disco);
 	
 	fclose(disco);
-	printf("Removido com sucesso\n");
+	printf("Removido com sucesso sem FAT\n");
 
 	return count;
 }
@@ -332,25 +340,29 @@ void imprimeRelatorio(relatorio *r, int n){
 	printf("=======================INSERÇÃO======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 1){
-			printf("Arquivo '%s':\n", r[i].nome);
-			printf("Duração: %lf segundos\n", r[i].tempo);
-			printf("Espaço ocupado pelo arquivo: %d blocos\n\n", r[i].espaco);
+			if(r[i].espaco != -1){	
+				printf("Arquivo '%s':\n", r[i].nome);
+				printf("Duração sem FAT: %lf segundos\n", r[i].tempo);
+				printf("Espaço ocupado pelo arquivo sem FAT: %d blocos\n\n", r[i].espaco);
+			}
 		}
 	}
 
 	printf("========================REMOÇÃO======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 2){
+			if(r[i].espaco != -1){		
 				printf("Arquivo '%s':\n", r[i].nome);
-				printf("Duração: %lf segundos\n", r[i].tempo);
-				printf("Espaço ocupado pelo arquivo: %d blocos\n\n", r[i].espaco);
+				printf("Duração sem FAT: %lf segundos\n", r[i].tempo);
+				printf("Espaço ocupado pelo arquivo sem FAT: %d blocos\n\n", r[i].espaco);
+			}
 		}
 	}	
 	printf("=========================BUSCA=======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 3){
 			printf("Arquivo '%s':\n", r[i].nome);
-			printf("Duração: %lf segundos\n\n", r[i].tempo);
+			printf("Duração sem FAT: %lf segundos\n", r[i].tempo);
 		}
 	}	
 	
@@ -358,35 +370,39 @@ void imprimeRelatorio(relatorio *r, int n){
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 4){
 			printf("Arquivo '%s':\n", r[i].nome);
-			printf("Duração: %lf segundos\n\n", r[i].tempo);
+			printf("Duração sem FAT: %lf segundos\n", r[i].tempo);
 		}
 	}
 
-	FILE *rel = fopen("relatorio.txt", "w+");
+	FILE *rel = fopen("RelatorioSemFat.txt", "w+");
 
 
 	fprintf(rel, "=======================INSERÇÃO======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 1){
-			fprintf(rel, "Arquivo '%s':\n", r[i].nome);
-			fprintf(rel, "Duração: %lf segundos\n", r[i].tempo);
-			fprintf(rel, "Espaço ocupado pelo arquivo: %d blocos\n\n", r[i].espaco);
+			if(r[i].espaco != -1){
+				fprintf(rel, "Arquivo '%s':\n", r[i].nome);
+				fprintf(rel, "Duração sem FAT: %lf segundos\n", r[i].tempo);
+				fprintf(rel, "Espaço ocupado pelo arquivo sem FAT: %d blocos\n\n", r[i].espaco);
+			}
 		}
 	}
 
 	fprintf(rel, "========================REMOÇÃO======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 2){
+			if(r[i].espaco != -1){
 				fprintf(rel, "Arquivo '%s':\n", r[i].nome);
-				fprintf(rel, "Duração: %lf segundos\n", r[i].tempo);
-				fprintf(rel, "Espaço ocupado pelo arquivo: %d blocos\n\n", r[i].espaco);
+				fprintf(rel, "Duração sem FAT: %lf segundos\n", r[i].tempo);
+				fprintf(rel, "Espaço ocupado pelo arquivo sem FAT: %d blocos\n\n", r[i].espaco);
+			}
 		}
 	}	
 	fprintf(rel, "=========================BUSCA=======================\n");
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 3){
 			fprintf(rel, "Arquivo '%s':\n", r[i].nome);
-			fprintf(rel, "Duração: %lf segundos\n\n", r[i].tempo);
+			fprintf(rel, "Duração sem FAT: %lf segundos\n", r[i].tempo);
 		}
 	}	
 	
@@ -394,24 +410,24 @@ void imprimeRelatorio(relatorio *r, int n){
 	for(int i = 0; i < n; i++){
 		if(r[i].operacao == 4){
 			fprintf(rel, "Arquivo '%s':\n", r[i].nome);
-			fprintf(rel, "Duração: %lf segundos\n\n", r[i].tempo);
+			fprintf(rel, "Duração sem FAT: %lf segundos\n", r[i].tempo);
 		}
 	}
 
 	fclose(rel);		
 }
 
+
 int main(int argc, char const *argv[]){
-	
-	//relatorio *r = (relatorio*) malloc(sizeof(relatorio));
+
 	relatorio r[1000];
 	int op;
 	int bloco;
 	int i = 0; 
 	char nome[9];
+
 	inicaliza();
-
-
+	
 	while(scanf("%d", &op) != EOF){
 	
 		if(op != 5){
@@ -427,7 +443,7 @@ int main(int argc, char const *argv[]){
 		r[i].operacao = op;
 		strcpy(r[i].nome, nome);
 		
-		switch(op){
+	switch(op){
 			
 			case 1:
 				fim = clock();
@@ -437,31 +453,25 @@ int main(int argc, char const *argv[]){
 			break;
 
 			case 2:
-				
 				fim = clock();
 				r[i].espaco = remover(nome);
 				fim = clock() - fim;
 				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
-				
 			break;
 
 			case 3:
-
 				fim = clock();
 				busca(nome);
 				fim = clock() - fim;
 				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
-		
 			break;
 
 			case 4:
-
 				scanf("%d", &bloco);
 				fim = clock();
 				buscaBloco(nome, bloco);
 				fim = clock() - fim;
 				r[i].tempo = (float)fim/CLOCKS_PER_SEC;
-
 			break;
 
 			case 5:
@@ -469,7 +479,6 @@ int main(int argc, char const *argv[]){
 			break;
 		}
 		i++;
-		//r = (relatorio *) realloc(r, sizeof(relatorio)*(i+3));
 	}
 
 
