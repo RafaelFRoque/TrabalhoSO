@@ -29,23 +29,17 @@ void inicaliza(FAT *fat){
 	
 	char c = 0;
 	int tamarq = TAMDSC;
-	FILE *disco = fopen("lista.txt", "w+");//disco = file lista
 	FILE *discoFAT = fopen("lfat.txt", "w+"); 
 	
 	fwrite(&c, sizeof(char), 1, discoFAT);//indica a estabilidade do arquivo
-	fwrite(&c, sizeof(char), 1, disco);
 	fwrite(&tamarq, sizeof(int), 1, discoFAT);//escreve a quantidade de espaço disponível
-	fwrite(&tamarq, sizeof(int), 1, disco);
 	
-	for(int i=0; i<tamarq; i++){
+	for(int i=0; i<tamarq; i++)
 		fwrite(&c, sizeof(char), 1, discoFAT);//completa os 16384 bytes com valores invalidos
-		fwrite(&c, sizeof(char), 1, disco);
-	}
 
 	for(int i=0; i< TAMDSC/TAMBLC; i++)//coloca todos as posição da FAT como vazias
 		fat->f[i] = -3;
 	fat->tamLista = 0;
-	fclose(disco);
 	fclose(discoFAT);
 }
 
